@@ -1,27 +1,45 @@
-import { isString, omit } from 'lodash';
-import stripAnsi from 'strip-ansi';
-
-import { Color, LoggerContext, LogLevel, stringify } from '@jshow/logger';
+import {
+  Color,
+  jsonStringifySafe,
+  type LogMeta,
+  type LogFunction,
+  type LoggerContext,
+  type LogLevel
+} from '@jshow/logger';
 import { isNode, isTest } from '@jshow/nest-common';
+
+import { isString, omit } from 'lodash-es';
+import stripAnsi from 'strip-ansi';
 
 import { coloredLogText, extractMessage } from '../utils';
 
+/** 由 namespace 文本生成确定性的前景/背景色。 */
 const makeContentStyle = (content: string): Color.LogColorStyle => {
   const majorColor = Color.makeColorHexFromText(content);
   const enhancedMajorColor = Color.betterLogColor(majorColor);
+
   return {
     backgroundColor: enhancedMajorColor,
-    contentColor: Color.isDarkColor(enhancedMajorColor) ? [0, 0, 0] : [255, 255, 255],
+    contentColor: Color.isDarkColor(enhancedMajorColor)
+      ? [0, 0, 0]
+      : [255, 255, 255]
   };
 };
 
-const processColoringPrefixChunks: (namespace: NonNullable<LoggerContext['namespace']>) => string[] = isNode
-  ? (namespace) => {
-      return [namespace.map((ns) => Color.wrapColorANSI(ns, makeContentStyle(ns))).join('/')];
+/** 将 namespace 片段格式化为 Node ANSI 或浏览器 CSS 输出。 */
+const processColoringPrefixChunks: (
+  namespace: NonNullable<LoggerContext['namespace']>
+) => string[] = isNode
+  ? namespace => {
+      return [
+        namespace
+          .map(ns => Color.wrapColorANSI(ns, makeContentStyle(ns)))
+          .join('/')
+      ];
     }
-  : (namespace) => {
+  : namespace => {
       const { contents, styles } = namespace
-        .map((ns) => Color.wrapColorCSS(ns, makeContentStyle(ns)))
+        .map(ns => Color.wrapColorCSS(ns, makeContentStyle(ns)))
         .reduce(
           (collection, [content, style]) => {
             collection.contents.push(content);
@@ -29,30 +47,45 @@ const processColoringPrefixChunks: (namespace: NonNullable<LoggerContext['namesp
 
             return collection;
           },
-          { contents: [] as string[], styles: [] as string[] },
+          { contents: [] as string[], styles: [] as string[] }
         );
       return [contents.join('/'), ...styles];
     };
 
+/**
+ * 创建 logger print 事件使用的 console transport。
+ *
+ * @returns 将 JSON 或文本日志写入 `console[level]` 的 transport。
+ */
 export const consoleTranportFactory =
-  () => (level: LogLevel, context: LoggerContext, messages: unknown[], getTimestamp: () => string | null) => {
+  () =>
+  (
+    level: LogLevel,
+    context: LoggerContext,
+    messages: unknown[],
+    getTimestamp: () => string | null
+  ) => {
     const timestamp = getTimestamp();
     const { config, namespace = [], tags = {}, extra = {} } = context;
-    const log = console[level];
+    // eslint-disable-next-line no-console
+    const log = console[level] as LogFunction;
 
     if (context.config.format === 'json') {
       log(
-        stringify({
+        jsonStringifySafe({
           level,
           ...omit(context, 'config'),
           messages: messages
-            .map((current) => {
-              if (isString(current)) return `${current}`;
-              else return `${extractMessage(current as any)}`;
-            }, '')
+            .map(
+              current =>
+                isString(current)
+                  ? current
+                  : `${extractMessage(current as LogMeta)}`,
+              ''
+            )
             .join(','),
-          timestamp,
-        }),
+          timestamp
+        })
       );
     }
 
@@ -62,22 +95,35 @@ export const consoleTranportFactory =
       if (timestamp) chunks.push(timestamp);
 
       if (config.enableNamespacePrefix && namespace.length) {
-        if (config.enableNamespacePrefixColors) chunks.push(...processColoringPrefixChunks(namespace));
-        else chunks.push(`${namespace.join('/')}`);
+        chunks.push(
+          ...(config.enableNamespacePrefixColors
+            ? processColoringPrefixChunks(namespace)
+            : [`${namespace.join('/')}`])
+        );
       }
 
       chunks.push(...messages);
       if (config.appendTagsForTextPrint && Object.keys(tags).length) {
-        if (config.transformTagsForTextPrint) chunks.push(config.transformTagsForTextPrint(tags, context));
-        else chunks.push(extractMessage(tags));
+        chunks.push(
+          config.transformTagsForTextPrint
+            ? config.transformTagsForTextPrint(tags, context)
+            : extractMessage(tags)
+        );
       }
 
       if (config.appendExtraForTextPrint && Object.keys(extra).length) {
-        if (config.transformExtraForTextPrint) chunks.push(config.transformExtraForTextPrint(extra, context));
-        else chunks.push(extractMessage(extra));
+        chunks.push(
+          config.transformExtraForTextPrint
+            ? config.transformExtraForTextPrint(extra, context)
+            : extractMessage(extra)
+        );
       }
 
-      const consoleInfo = chunks.map((c) => (isString(c) ? c : extractMessage((c as any) ?? {}))).join(' ');
+      const consoleInfo = chunks
+        .map(msg =>
+          isString(msg) ? msg : extractMessage((msg ?? {}) as LogMeta)
+        )
+        .join(' ');
 
       if (isTest) {
         switch (level) {

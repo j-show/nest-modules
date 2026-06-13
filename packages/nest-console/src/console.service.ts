@@ -1,154 +1,216 @@
-import { INestApplication, Injectable } from '@nestjs/common';
-import { MetadataScanner, ModulesContainer } from '@nestjs/core';
-import { Injector } from '@nestjs/core/injector/injector';
-import { Module } from '@nestjs/core/injector/module';
-import commander from 'commander';
-import { get, sortBy } from 'lodash';
+import { type Constructor, type NestLogger } from '@jshow/nest-common';
 
-import { Constructor, NestLogger } from '@jshow/nest-common';
+import { type INestApplication, Injectable } from '@nestjs/common';
+import { type MetadataScanner, type ModulesContainer } from '@nestjs/core';
+import { Injector } from '@nestjs/core/injector/injector';
+import { type Module } from '@nestjs/core/injector/module';
+
+import { type Command, program } from 'commander';
+import { get, sortBy } from 'lodash-es';
 
 import {
-  ArgumentMetaInfo,
-  CommandMetaInfo,
+  type ArgumentMetaInfo,
+  type CommandMetaInfo,
   META_COMMAND,
   META_COMMAND_ARGUMENTS,
   META_COMMAND_OPTIONS,
   META_CONSOLE,
   META_MODULE_COMMANDS,
-  OptionMetaInfo,
+  type OptionMetaInfo
 } from './decorators';
-import { ConsoleRunOptions } from './defines';
+import { type ConsoleRunOptions } from './defines';
 
+/** 扫描装饰器命令类并注册到 commander 的服务。 */
 @Injectable()
 export class ConsoleService {
   private readonly instanceLoader = new Injector();
-  private callback?: Function;
+  private callback?: ConsoleRunOptions['callback'];
   private logger?: NestLogger;
 
   constructor(
-    protected readonly modulesContainer: ModulesContainer,
-    protected readonly metadataScanner: MetadataScanner,
+    private readonly modulesContainer: ModulesContainer,
+    private readonly metadataScanner: MetadataScanner
   ) {}
 
-  public run({ app, name, version = 'v0.1.0', args = process.argv, logger = console, callback }: ConsoleRunOptions) {
+  /**
+   * 注册模块声明的命令类并解析命令行参数。
+   *
+   * @param options 控制台运行时选项。
+   */
+  public run({
+    app,
+    name,
+    version = 'v0.1.0',
+    args = process.argv,
+    logger = console,
+    callback
+  }: ConsoleRunOptions) {
     this.callback = callback;
     this.logger = logger;
 
-    const { program } = commander;
-    this.modulesContainer.forEach((module) => {
-      const commands = Reflect.getMetadata(META_MODULE_COMMANDS, module.metatype);
-      if (!commands) {
-        return;
-      }
-      commands.map((component: Constructor<any>) => {
+    this.modulesContainer.forEach(module => {
+      const commands = Reflect.getMetadata(
+        META_MODULE_COMMANDS,
+        module.metatype
+      );
+      if (!commands) return;
+
+      commands.map((component: Constructor) => {
+        // Nest 解析实例前，在运行时将命令类加入 module injectables。
         Injectable()(component);
-        module.addInjectable(component);
+        module.addInjectable(component, 'pipe');
         this.addCommand(app, program, component, module);
       });
     });
-    program.allowUnknownOption(false).enablePositionalOptions(false).name(name).version(version).parseAsync(args);
+
+    program
+      .allowUnknownOption(false)
+      .enablePositionalOptions(false)
+      .name(name)
+      .version(version)
+      .parseAsync(args);
   }
 
+  /**
+   * `run` 的 Promise 包装，通过 callback 路径 resolve。
+   *
+   * @param options 不含 callback 的控制台运行时选项。
+   * @returns 由 callback 值 resolve 的 Promise。
+   */
   public runP(options: Omit<ConsoleRunOptions, 'callback'>) {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       this.run(Object.assign(options, { callback: resolve }));
     });
   }
 
-  public addCommand(app: INestApplication, prog: commander.Command, commandClass: Constructor<any>, module: Module) {
+  /**
+   * 将单个装饰器命令类注册到 commander program。
+   *
+   * @param app 用于解析命令实例的 Nest 应用。
+   * @param prog 待修改的 commander program。
+   * @param commandClass 装饰器标记的命令类。
+   * @param module 拥有该命令类的 Nest 模块。
+   * @returns 传入的 commander program。
+   */
+  public addCommand(
+    app: INestApplication,
+    prog: Command,
+    commandClass: Constructor,
+    module: Module
+  ) {
     const consoleMeta = Reflect.getMetadata(META_CONSOLE, commandClass);
-
-    if (!consoleMeta) {
-      return prog;
-    }
+    if (!consoleMeta) return prog;
 
     const prefix = consoleMeta.prefix ? `${consoleMeta.prefix}:` : '';
 
-    this.metadataScanner.scanFromPrototype(commandClass, commandClass.prototype, (method) => {
-      const commandMeta: CommandMetaInfo = Reflect.getMetadata(META_COMMAND, commandClass, method);
-      if (!commandMeta) {
-        return;
-      }
-      const command = prog.command(`${prefix}${commandMeta.name}`).description(commandMeta.description ?? '');
-      if (commandMeta.alias) {
-        command.alias(commandMeta.alias);
-      }
-      const argumentsMeta: ArgumentMetaInfo[] = Reflect.getMetadata(META_COMMAND_ARGUMENTS, commandClass, method);
-      const argsInfo: Array<{ path: string[]; parameterIndex: number }> = [];
-      if (argumentsMeta) {
+    this.metadataScanner
+      .getAllMethodNames(commandClass.prototype)
+      .forEach(method => {
+        const commandMeta: CommandMetaInfo = Reflect.getMetadata(
+          META_COMMAND,
+          commandClass,
+          method
+        );
+        if (!commandMeta) return;
+
+        const command = prog
+          .command(`${prefix}${commandMeta.name}`)
+          .description(commandMeta.description ?? '');
+
+        if (commandMeta.alias) {
+          command.alias(commandMeta.alias);
+        }
+
+        const argsInfo: Array<{ path: string[]; parameterIndex: number }> = [];
+
+        const argumentsMeta: ArgumentMetaInfo[] =
+          Reflect.getMetadata(META_COMMAND_ARGUMENTS, commandClass, method) ||
+          [];
         for (const argumentMeta of sortBy(argumentsMeta, 'parameterIndex')) {
           argsInfo.push({
             path: ['args', argumentMeta.name],
-            parameterIndex: argumentMeta.parameterIndex,
+            parameterIndex: argumentMeta.parameterIndex
           });
-          if (argumentMeta.required) {
-            command.arguments(`<${argumentMeta.name}>`);
-          } else {
-            command.arguments(`[${argumentMeta.name}]`);
-          }
-        }
-      }
 
-      const optionsMeta: OptionMetaInfo[] = Reflect.getMetadata(META_COMMAND_OPTIONS, commandClass, method);
-      if (optionsMeta) {
+          command.arguments(
+            argumentMeta.required
+              ? `<${argumentMeta.name}>`
+              : `[${argumentMeta.name}]`
+          );
+        }
+
+        const optionsMeta: OptionMetaInfo[] =
+          Reflect.getMetadata(META_COMMAND_OPTIONS, commandClass, method) || [];
         for (const optionMeta of sortBy(optionsMeta, 'parameterIndex')) {
           argsInfo.push({
             path: ['options', optionMeta.name],
-            parameterIndex: optionMeta.parameterIndex,
+            parameterIndex: optionMeta.parameterIndex
           });
-          let optionSetter = 'option';
-          if (optionMeta.required) {
-            optionSetter = 'requiredOption';
-          }
+
+          const optionSetter = optionMeta.required
+            ? 'requiredOption'
+            : 'option';
+
           command[optionSetter](
             `--${optionMeta.name} <${optionMeta.name}>`,
             optionMeta.description,
-            optionMeta.defaultValue,
+            optionMeta.defaultValue
           );
         }
-      }
 
-      /**
-       * parsedArgs: [...args, options, command]
-       * 命令处理函数的参数，为该命令声明的所有参数，除此之外还会附加两个额外参
-       * 数：一个是解析出的选项，另一个则是该命令对象自身。
-       */
-      command.action(async (...parsedArgs: any[]) => {
-        const args: { [index: string]: string } = {};
-        const options: { [index: string]: string } = parsedArgs[parsedArgs.length - 2];
-        if (parsedArgs.length > 2) {
-          for (const argumentMeta of sortBy(argumentsMeta, 'parameterIndex')) {
-            args[argumentMeta.name] = parsedArgs.shift();
+        /**
+         * parsedArgs: [...args, options, command]
+         * 命令处理函数的参数为声明的所有参数，末尾还会附加 logger。
+         */
+        command.action(async (...inputs: unknown[]) => {
+          const args: Record<string, string> = {};
+          const options = inputs[inputs.length - 2] as Record<string, string>;
+
+          if (inputs.length > 2) {
+            for (const argumentMeta of sortBy(
+              argumentsMeta,
+              'parameterIndex'
+            )) {
+              args[argumentMeta.name] = inputs.shift() as string;
+            }
           }
-        }
-        try {
-          const injectable = module.injectables.get(commandClass.name);
-          if (!injectable) {
-            throw new Error(`Can not get injectable: ${commandClass.name}`);
+
+          try {
+            const injectable = module.injectables.get(commandClass.name);
+            if (!injectable) {
+              throw new Error(`Can not get injectable: ${commandClass.name}`);
+            }
+
+            // 从 Nest 取实例前先加载运行时加入的 injectable。
+            this.instanceLoader.loadPrototype(injectable, module.injectables);
+            await this.instanceLoader.loadInjectable(injectable, module);
+
+            const commandInstance = app.get(commandClass) as Record<
+              string,
+              (...args: unknown[]) => Promise<void>
+            >;
+            const methodArgs = [];
+            const params = { args, options };
+
+            for (const argInfo of sortBy(argsInfo, 'parameterIndex')) {
+              methodArgs.push(get(params, argInfo.path));
+            }
+            methodArgs.push(this.logger);
+
+            // eslint-disable-next-line prefer-spread
+            await commandInstance[method].apply(commandInstance, methodArgs);
+
+            this.callback?.();
+          } catch (e) {
+            if (this.callback) {
+              this.callback(e as Error);
+            } else {
+              throw e;
+            }
           }
-          this.instanceLoader.loadPrototype(injectable, module.injectables);
-          await this.instanceLoader.loadInjectable(injectable, module);
-          const commandInstance = app.get(commandClass);
-          const methodArgs = [];
-          const params = { args, options };
-          for (const argInfo of sortBy(argsInfo, 'parameterIndex')) {
-            methodArgs.push(get(params, argInfo.path));
-          }
-          methodArgs.push(this.logger);
-          // eslint-disable-next-line prefer-spread
-          await commandInstance[method].apply(commandInstance, methodArgs);
-          if (this.callback) {
-            this.callback();
-          }
-        } catch (e) {
-          if (this.callback) {
-            this.callback(e);
-          } else {
-            throw e;
-          }
-        }
+        });
       });
-    });
+
     return prog;
   }
 }

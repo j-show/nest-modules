@@ -2,34 +2,40 @@
   "name": "@jshow/nest-logger",
   "license": "MIT",
   "version": "1.0.1",
-  "description": "jShow Nest Logger",
-  "main": "lib/index.js",
-  "module": "lib-es/index.js",
-  "types": "lib/index.d.ts",
-  "files": ["lib", "lib-es"],
-  "scripts": {
-    "build": "ts-node -T ../../scripts/build-self.ts",
-    "postbuild": "eval \"cd ../.. && yarn build:update ${PWD##*/}\"",
-    "lint": "yarn type-coverage  --ignore-catch --at-least 99 -p ./tsconfig.build.json",
-    "test": "yarn lint && yarn tsc && yarn unit-test",
-    "unit-test": "echo mocha -r ts-register --recursive test/**/*.test.ts",
-    "tsc": "tsc --noEmit -p ./tsconfig.build.json"
+  "description": "jShow Nest Logger for Next.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
   },
-  "externalModules": ["@jshow/logger"],
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "postbuild1": "eval \"cd ../.. && pnpm build:update ${PWD##*/}\"",
+    "tsc": "tsc --noEmit -p ./tsconfig.json"
+  },
   "dependencies": {
-    "@jshow/logger": "^1.0.1",
-    "@jshow/nest-common": "^1.0.1",
-    "@nestjs/common": "^8.4.7",
-    "chalk": "^5.0.1",
-    "debug": "^4.3.4",
-    "lodash": "^4.17.21",
-    "moment": "^2.29.3",
-    "prettyjson": "^1.2.5",
-    "strip-ansi": "^7.0.1"
+    "@jshow/logger": "catalog:",
+    "@jshow/nest-common": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "chalk": "catalog:",
+    "dayjs": "catalog:",
+    "debug": "catalog:",
+    "lodash-es": "catalog:",
+    "strip-ansi": "^7.2.0",
+    "tslib": "catalog:",
+    "prettyjson": "^1.2.5"
   },
   "devDependencies": {
-    "@types/debug": "^4.1.7",
-    "@types/lodash": "^4.14.182",
-    "@types/prettyjson": "^0.0.30"
+    "@types/prettyjson": "^0.0.33"
+  },
+  "peerDependencies": {
+    "@jshow/logger": "catalog:",
+    "@jshow/nest-common": "workspace:*",
+    "@nestjs/common": "catalog:"
   }
 }

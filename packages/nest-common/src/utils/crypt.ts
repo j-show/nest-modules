@@ -2,12 +2,12 @@
  * 本模块存放各种字符串转换相关函数
  */
 
-import { chain } from 'lodash';
-import md5 from 'md5';
-import moment from 'moment';
-import { v4 as uuidV4 } from 'uuid';
+import crypto from 'node:crypto';
 
-import { anyBase } from './anyBase';
+import { default as dayjs } from 'dayjs';
+import { chain } from 'lodash-es';
+
+import { anyBase } from './any';
 
 /**
  * 最保守的 URI 安全字
@@ -21,14 +21,54 @@ const HEX2USC: (x: string) => string = anyBase('HEX', URISafeCharSet);
 // 10进制转 URI 安全字
 const DEC2USC: (x: string) => string = anyBase('DEC', URISafeCharSet);
 
-export const safeShortenUUID = (): string => HEX2USC(uuidV4().replace(/-/g, ''));
-export const safeShortenDate = (): string => DEC2USC(moment().format('YYYYMMDD'));
+/**
+ * 计算字符串的小写 MD5 摘要。
+ *
+ * @param x 输入字符串。
+ * @returns 小写十六进制 MD5 摘要。
+ */
+export const MD5 = (x: string) => {
+  return crypto.createHash('md5').update(x).digest('hex') as Lowercase<string>;
+};
 
-export const getObjectHash = (obj: {}) => {
+/**
+ * 生成小写随机 UUID。
+ *
+ * @returns 小写 UUID 字符串。
+ */
+export const UUID = () => {
+  return crypto.randomUUID() as Lowercase<string>;
+};
+
+/**
+ * 使用本模块保守字母表生成 URI 安全的短 UUID。
+ *
+ * @returns 短小写标识符。
+ */
+export const safeShortenUUID = (): string => {
+  return HEX2USC(UUID().replace(/-/g, ''));
+};
+
+/**
+ * 从当前日期生成 URI 安全的紧凑日期标识符。
+ *
+ * @returns 短小写日期 token。
+ */
+export const safeShortenDate = (): string => {
+  return DEC2USC(dayjs().format('YYYYMMDD'));
+};
+
+/**
+ * 对对象顶层键值对排序后计算 MD5 哈希。
+ *
+ * @param obj 待哈希对象。
+ * @returns 对象顶层键值对的稳定小写哈希。
+ */
+export const getObjectHash = (obj: {}): string => {
   return chain(obj)
     .toPairs()
-    .sortBy((pair) => pair[0])
-    .thru((ele) => JSON.stringify(ele))
-    .thru((ele) => md5(ele))
+    .sortBy(pair => pair[0])
+    .thru(ele => JSON.stringify(ele))
+    .thru(ele => MD5(ele))
     .value();
 };

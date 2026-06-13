@@ -1,0 +1,38 @@
+name: Pull Request Check
+
+on:
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Debug PR info
+        run: |
+          echo "Base branch: ${{ github.event.pull_request.base.ref }}"
+          echo "Head branch: ${{ github.event.pull_request.head.ref }}"
+          echo "PR number: ${{ github.event.pull_request.number }}"
+
+      - name: Install Dependencies & Build
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm run build
+
+      - name: Test rule
+        run: pnpm run test
