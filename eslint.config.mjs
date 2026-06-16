@@ -6,7 +6,13 @@ export default [
   ...jshowConfig.node,
   ...prettierConfigs,
   {
-    ignores: ['**/dist/*', '**/node_modules/*', '**/build/*', 'pnpm-lock.yaml']
+    ignores: [
+      '**/dist/*',
+      '**/node_modules/*',
+      '**/build/*',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml'
+    ]
   },
   {
     rules: {

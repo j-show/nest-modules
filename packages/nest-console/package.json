@@ -15,7 +15,6 @@
   ],
   "scripts": {
     "build": "vite build",
-    "postbuild1": "eval \"cd ../.. && pnpm build:update ${PWD##*/}\"",
     "tsc": "tsc --noEmit -p ./tsconfig.json"
   },
   "dependencies": {
@@ -30,7 +29,6 @@
   },
   "peerDependencies": {
     "@jshow/logger": "catalog:",
-    "@jshow/nest-common": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "reflect-metadata": "catalog:"

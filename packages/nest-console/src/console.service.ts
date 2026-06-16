@@ -68,18 +68,35 @@ export class ConsoleService {
       .enablePositionalOptions(false)
       .name(name)
       .version(version)
-      .parseAsync(args);
+      .parseAsync(args)
+      .catch((error: Error) => {
+        if (this.callback) {
+          this.callback(error);
+        } else {
+          throw error;
+        }
+      });
   }
 
   /**
-   * `run` 的 Promise 包装，通过 callback 路径 resolve。
+   * `run` 的 Promise 包装；命令失败时 reject。
    *
    * @param options 不含 callback 的控制台运行时选项。
-   * @returns 由 callback 值 resolve 的 Promise。
+   * @returns 命令成功完成时 resolve 的 Promise。
    */
   public runP(options: Omit<ConsoleRunOptions, 'callback'>) {
-    return new Promise(resolve => {
-      this.run(Object.assign(options, { callback: resolve }));
+    return new Promise<void>((resolve, reject) => {
+      this.run(
+        Object.assign(options, {
+          callback: (error?: Error) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+            resolve();
+          }
+        })
+      );
     });
   }
 

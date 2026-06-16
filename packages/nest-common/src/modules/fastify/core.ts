@@ -9,7 +9,7 @@ import {
 
 const initFastifyInstance = (
   fastify: FastifyInstance,
-  _?: FastifyAdapterOptions['hooks']
+  hooks?: FastifyAdapterOptions['hooks']
 ) => {
   // multipart 载荷保持为 stream，由下游 handler 自行解析。
   fastify.addContentTypeParser(
@@ -22,6 +22,13 @@ const initFastifyInstance = (
       done(null, payload);
     }
   );
+
+  if (hooks?.onSend) {
+    const onSend = hooks.onSend;
+    fastify.addHook('onSend', async () => {
+      onSend();
+    });
+  }
 };
 
 /**

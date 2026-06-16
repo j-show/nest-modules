@@ -15,7 +15,6 @@
   ],
   "scripts": {
     "build": "vite build",
-    "postbuild1": "eval \"cd ../.. && pnpm build:update ${PWD##*/}\"",
     "tsc": "tsc --noEmit -p ./tsconfig.json"
   },
   "dependencies": {

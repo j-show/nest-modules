@@ -15,10 +15,13 @@
   },
   "scripts": {
     "prepare": "husky",
-    "eslint": "eslint --config ./eslint.config.js --fix --quiet --no-warn-ignored",
-    "prettier": "prettier --config ./.prettierrc --write .",
-    "clean": "rm -rf packages/**/dist",
-    "build": "pnpm -r build"
+    "build": "pnpm build:clean && pnpm -r build",
+    "build:clean": "rm -rf packages/**/dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint --config ./eslint.config.mjs --fix --quiet --no-warn-ignored",
+    "prettier": "prettier --config ./.prettierrc --write",
+    "create:pkg": "node ./scripts/create-pkg.cjs"
   },
   "devDependencies": {
     "@types/debug": "^4.1.13",
@@ -45,12 +48,11 @@
   },
   "lint-staged": {
     "*.{md,json}": [
-      "prettier --config ./.prettierrc --write",
-      "git add"
+      "pnpm prettier"
     ],
     "*.{ts,js,tsx,jsx,vue}": [
-      "prettier --config ./.prettierrc --write",
-      "pnpm eslint"
+      "pnpm prettier",
+      "pnpm lint"
     ]
   }
 }

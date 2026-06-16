@@ -13,3 +13,6 @@ es/
 logs/
 logs-meta/
 .eslintcache/
+
+pnpm-lock.yaml
+pnpm-workspace.yaml

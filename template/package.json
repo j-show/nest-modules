@@ -1,8 +1,8 @@
 {
-  "name": "@jshow/nest-logger",
+  "name": "@jshow/nest-{NAME}",
   "license": "MIT",
   "version": "1.0.1",
-  "description": "jShow Nest Logger for Next.js",
+  "description": "jShow Nest {DNAME} for Next.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -20,17 +20,8 @@
   "dependencies": {
     "@jshow/logger": "catalog:",
     "@jshow/nest-common": "workspace:*",
-    "@nestjs/common": "catalog:",
-    "chalk": "catalog:",
-    "dayjs": "catalog:",
-    "debug": "catalog:",
-    "lodash-es": "catalog:",
-    "strip-ansi": "^7.2.0",
-    "tslib": "catalog:",
-    "prettyjson": "^1.2.5"
-  },
-  "devDependencies": {
-    "@types/prettyjson": "^0.0.33"
+    "@jshow/nest-logger": "workspace:*",
+    "@nestjs/common": "catalog:"
   },
   "peerDependencies": {
     "@jshow/logger": "catalog:",

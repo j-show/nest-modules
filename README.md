@@ -25,8 +25,9 @@ pnpm install
 ## 常用命令
 
 ```bash
-pnpm run eslint .
+pnpm run lint
 pnpm run prettier
+pnpm run test
 pnpm --filter @jshow/nest-common run tsc
 pnpm --filter @jshow/nest-logger run tsc
 pnpm --filter @jshow/nest-console run tsc
@@ -37,8 +38,10 @@ pnpm run build
 
 | 命令 | 作用 |
 | --- | --- |
-| `pnpm run clean` | 删除 `packages/**/dist`。 |
-| `pnpm run build` | 按拓扑顺序构建全部 workspace 包。 |
+| `pnpm run test:watch` | Vitest 监听模式。 |
+| `pnpm run build:clean` | 删除 `packages/**/dist`。 |
+| `pnpm run build` | 清理 dist 后按 workspace 拓扑构建全部包。 |
+| `pnpm run create:pkg -- <name>` | 从 `template/` 脚手架创建 `packages/nest-<name>`。 |
 
 发布、召回和 tag 发布脚本会触碰 npm、git tag 或远端状态，执行前先确认当前分支、版本和 registry。
 
@@ -106,6 +109,9 @@ packages/
   nest-common/   # 共享异常、Fastify helper、类型与工具
   nest-console/  # 控制台装饰器、模块与服务
   nest-logger/   # logger factory、中间件与 transport
+  */test/        # 各包 Vitest 用例（根目录 vitest.config.ts 统一运行）
+scripts/         # create-pkg.cjs 等新包脚手架
+template/        # create:pkg 复制的包模板
 docs/agents/     # 面向 AI 编码代理的项目说明
 ```
 
